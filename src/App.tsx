@@ -24,6 +24,7 @@ export default function App() {
   const [result, setResult] = useState<ExtractedField[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { loadConfig().then(setConfig); }, []);
   if (!config) return null;
@@ -31,6 +32,7 @@ export default function App() {
   async function extract() {
     setLoading(true);
     setResult(null);
+    setError('');
     try {
       if (config!.deploymentId === 'local') {
         await new Promise((r) => setTimeout(r, 1500));
@@ -40,11 +42,13 @@ export default function App() {
           `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'process' }) }
         );
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
         const data = await res.json();
-        setResult(data.fields);
+        setResult(data.fields ?? []);
       }
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally { setLoading(false); }
   }
 
   function copy() {
@@ -72,7 +76,10 @@ export default function App() {
         <button onClick={extract} disabled={loading || !input.trim()} style={{ backgroundColor: config.brandColour }} className="px-6 py-2.5 rounded-lg font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity">
           {loading ? 'Extracting...' : 'Extract data'}
         </button>
-        {result && (
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">{error}</div>
+        )}
+        {result && result.length > 0 && (
           <div className="space-y-4 pt-4">
             <section className="bg-white/5 border border-white/10 rounded-lg p-5">
               <h2 className="text-lg font-semibold mb-3">Extracted Fields</h2>
