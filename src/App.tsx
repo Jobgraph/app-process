@@ -74,6 +74,9 @@ export default function App() {
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">{error}</div>
         )}
+        {result && result.length === 0 && (
+          <p className="text-white/50 text-center py-8">No fields could be extracted from this content.</p>
+        )}
         {result && result.length > 0 && (
           <div className="space-y-4 pt-4">
             <section className="bg-white/5 border border-white/10 rounded-lg p-5">
