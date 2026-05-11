@@ -6,18 +6,6 @@ interface ExtractedField {
   value: string;
 }
 
-const MOCK_RESPONSE: ExtractedField[] = [
-  { key: 'Vendor', value: 'Acme Solutions Ltd' },
-  { key: 'Invoice Number', value: 'INV-2024-0847' },
-  { key: 'Date', value: '2024-05-03' },
-  { key: 'Due Date', value: '2024-06-02' },
-  { key: 'Amount', value: '£4,250.00' },
-  { key: 'Tax (VAT 20%)', value: '£850.00' },
-  { key: 'Total', value: '£5,100.00' },
-  { key: 'Status', value: 'Unpaid' },
-  { key: 'Payment Terms', value: 'Net 30' },
-];
-
 export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [input, setInput] = useState('');
@@ -29,23 +17,30 @@ export default function App() {
   useEffect(() => { loadConfig().then(setConfig); }, []);
   if (!config) return null;
 
+  if (!config.isConfigured) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <div className="text-center max-w-md space-y-4">
+          <h1 className="text-2xl font-semibold">{config.appName}</h1>
+          <p className="text-white/60">This app is not configured. Deploy it from Jobgraph to get started.</p>
+          <a href="https://app.jobgraph.com" className="inline-block px-4 py-2 bg-indigo-600 rounded-lg text-white hover:bg-indigo-500 transition-colors">Go to Jobgraph</a>
+        </div>
+      </div>
+    );
+  }
+
   async function extract() {
     setLoading(true);
     setResult(null);
     setError('');
     try {
-      if (config!.deploymentId === 'local') {
-        await new Promise((r) => setTimeout(r, 1500));
-        setResult(MOCK_RESPONSE);
-      } else {
-        const res = await fetch(
-          `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'process' }) }
-        );
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        const data = await res.json();
-        setResult(data.fields ?? []);
-      }
+      const res = await fetch(
+        `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'process' }) }
+      );
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      setResult(data.fields ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally { setLoading(false); }
@@ -101,7 +96,7 @@ export default function App() {
               </table>
             </section>
             <button onClick={copy} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm transition-colors">
-              {copied ? '✓ Copied!' : 'Copy extracted data'}
+              {copied ? '✓ Copied!' : 'Copy as text'}
             </button>
           </div>
         )}
