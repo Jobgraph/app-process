@@ -104,7 +104,9 @@ export function ProcessPanel({
         setFilename(file.name);
         const reader = new FileReader();
         reader.onload = (e) => {
-          setFileContent(e.target?.result as string ?? null);
+          const content = e.target?.result as string ?? null;
+          setFileContent(content);
+          if (content) setInput(content);
         };
         reader.onerror = () => {
           setFileContent(null);
