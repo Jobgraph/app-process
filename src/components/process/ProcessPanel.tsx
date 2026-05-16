@@ -69,7 +69,7 @@ export function ProcessPanel({
   const [input, setInput] = useState('');
   const [template, setTemplate] = useState<DocumentType>('general');
   const [filename, setFilename] = useState<string | null>(null);
-  const [_fileContent, setFileContent] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<string | null>(null);
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -104,7 +104,9 @@ export function ProcessPanel({
         setFilename(file.name);
         const reader = new FileReader();
         reader.onload = (e) => {
-          setFileContent(e.target?.result as string ?? null);
+          const content = e.target?.result as string ?? null;
+          setFileContent(content);
+          if (content) setInput(content);
         };
         reader.onerror = () => {
           setFileContent(null);
