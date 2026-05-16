@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { updateEntry } from '../../lib/history';
 import type { DocumentType, HistoryEntry, Confidence } from '../../lib/types';
 
 interface ProcessPanelProps {
@@ -66,17 +67,20 @@ export function ProcessPanel({
   const [input, setInput] = useState('');
   const [template, setTemplate] = useState<DocumentType>('general');
   const [filename, setFilename] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<string | null>(null);
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [localFields, setLocalFields] = useState<HistoryEntry['result']>(null);
   const [trackedEntryId, setTrackedEntryId] = useState<string | null>(null);
 
-  // Reset local fields when the active entry changes
+  // Reset local fields and edit state when the active entry changes
   useEffect(() => {
     if (activeEntry?.id !== trackedEntryId) {
       setTrackedEntryId(activeEntry?.id ?? null);
       setLocalFields(null);
+      setEditingKey(null);
+      setEditValue('');
     }
   }, [activeEntry?.id, trackedEntryId]);
 
@@ -94,7 +98,17 @@ export function ProcessPanel({
     el.accept = '.txt,.pdf,.doc,.docx,.eml,.csv,.json';
     el.onchange = () => {
       const file = el.files?.[0];
-      if (file) setFilename(file.name);
+      if (file) {
+        setFilename(file.name);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setFileContent(e.target?.result as string ?? null);
+        };
+        reader.onerror = () => {
+          setFileContent(null);
+        };
+        reader.readAsText(file);
+      }
     };
     el.click();
   }, []);
@@ -140,7 +154,7 @@ export function ProcessPanel({
   }, []);
 
   const saveEdit = useCallback(() => {
-    if (!result || !editingKey) return;
+    if (!result || !editingKey || !activeEntry) return;
     const updated = {
       ...result,
       fields: result.fields.map((f) =>
@@ -150,7 +164,9 @@ export function ProcessPanel({
     setLocalFields(updated);
     setEditingKey(null);
     setEditValue('');
-  }, [result, editingKey, editValue]);
+    // Persist the edit to localStorage so it survives navigation
+    updateEntry({ ...activeEntry, result: updated });
+  }, [result, editingKey, editValue, activeEntry]);
 
   const cancelEdit = useCallback(() => {
     setEditingKey(null);
@@ -198,7 +214,7 @@ export function ProcessPanel({
                 <Upload className="h-3 w-3" />
                 {filename}
                 <button
-                  onClick={() => setFilename(null)}
+                  onClick={() => { setFilename(null); setFileContent(null); }}
                   className="ml-1 hover:text-foreground"
                 >
                   <X className="h-3 w-3" />
