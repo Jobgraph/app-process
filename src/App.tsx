@@ -1,109 +1,155 @@
-import { useState, useEffect } from 'react';
-import { type AppConfig, loadConfig } from './config';
-
-interface ExtractedField {
-  key: string;
-  value: string;
-}
+import { useState, useCallback } from 'react';
+import { Loader2 } from 'lucide-react';
+import { Toaster, toast } from 'sonner';
+import { ThemeContext } from './lib/theme';
+import type { DocumentType, HistoryEntry } from './lib/types';
+import { getMockExtraction } from './lib/mock';
+import {
+  getHistory,
+  addEntry,
+  updateEntry,
+  deleteEntry,
+  clearAll,
+} from './lib/history';
+import { useThemeProvider } from './hooks/useTheme';
+import { useConfig } from './hooks/useConfig';
+import { AppShell } from './components/shell/AppShell';
+import { ProcessPanel } from './components/process/ProcessPanel';
 
 export default function App() {
-  const [config, setConfig] = useState<AppConfig | null>(null);
-  const [input, setInput] = useState('');
-  const [result, setResult] = useState<ExtractedField[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState('');
+  const themeCtx = useThemeProvider();
+  const { config, loading: configLoading } = useConfig();
 
-  useEffect(() => { loadConfig().then(setConfig); }, []);
-  if (!config) return null;
+  const [entries, setEntries] = useState<HistoryEntry[]>(getHistory);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
 
-  if (!config.isConfigured) {
+  const activeEntry = entries.find((e) => e.id === activeId) ?? null;
+
+  const handleNew = useCallback(() => {
+    setActiveId(null);
+  }, []);
+
+  const handleSelect = useCallback((id: string) => {
+    setActiveId(id);
+  }, []);
+
+  const handleDelete = useCallback(
+    (id: string) => {
+      deleteEntry(id);
+      const updated = entries.filter((e) => e.id !== id);
+      setEntries(updated);
+      if (activeId === id) setActiveId(null);
+      toast.success('Entry deleted');
+    },
+    [entries, activeId],
+  );
+
+  const handleClearAll = useCallback(() => {
+    clearAll();
+    setEntries([]);
+    setActiveId(null);
+    toast.success('History cleared');
+  }, []);
+
+  const handleExtract = useCallback(
+    (input: string, template: DocumentType) => {
+      const id = crypto.randomUUID();
+      const entry: HistoryEntry = {
+        id,
+        createdAt: new Date().toISOString(),
+        inputPreview: input.slice(0, 80),
+        input,
+        template,
+        result: null,
+        status: 'pending',
+      };
+
+      addEntry(entry);
+      setEntries((prev) => [entry, ...prev]);
+      setActiveId(id);
+      setExtracting(true);
+
+      // Simulate extraction delay
+      setTimeout(() => {
+        try {
+          const result = getMockExtraction(input, template);
+          const completed: HistoryEntry = {
+            ...entry,
+            result,
+            status: 'complete',
+          };
+          updateEntry(completed);
+          setEntries((prev) =>
+            prev.map((e) => (e.id === id ? completed : e)),
+          );
+          toast.success(
+            `Extracted ${result.fields.length} fields from ${result.documentTypeLabel}`,
+          );
+        } catch {
+          const failed: HistoryEntry = {
+            ...entry,
+            status: 'error',
+            errorMessage: 'Extraction failed. Please try again.',
+          };
+          updateEntry(failed);
+          setEntries((prev) =>
+            prev.map((e) => (e.id === id ? failed : e)),
+          );
+          toast.error('Extraction failed');
+        } finally {
+          setExtracting(false);
+        }
+      }, 1000);
+    },
+    [],
+  );
+
+  if (configLoading || !config) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+      <div className="flex items-center justify-center h-screen bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!config.isConfigured && config.deploymentId !== 'local') {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-background p-6">
         <div className="text-center max-w-md space-y-4">
-          <h1 className="text-2xl font-semibold">{config.appName}</h1>
-          <p className="text-white/60">This app is not configured. Deploy it from Jobgraph to get started.</p>
-          <a href="https://app.jobgraph.com" className="inline-block px-4 py-2 bg-indigo-600 rounded-lg text-white hover:bg-indigo-500 transition-colors">Go to Jobgraph</a>
+          <h1 className="text-2xl font-extrabold text-foreground">{config.appName}</h1>
+          <p className="text-sm text-muted-foreground">This app is not yet configured. Deploy it from Jobgraph to get started.</p>
+          <a href="https://app.jobgraph.com" className="inline-block px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">Go to Jobgraph</a>
         </div>
       </div>
     );
   }
 
-  async function extract() {
-    setLoading(true);
-    setResult(null);
-    setError('');
-    try {
-      const res = await fetch(
-        `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'process' }) }
-      );
-      if (!res.ok) throw new Error(`Request failed (${res.status})`);
-      const data = await res.json();
-      setResult(data.fields ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-    } finally { setLoading(false); }
-  }
-
-  function copy() {
-    if (!result) return;
-    const text = result.map(f => `${f.key}: ${f.value}`).join('\n');
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b border-white/10 px-6 py-4 flex items-center gap-3">
-        {config.logoUrl && <img src={config.logoUrl} alt="" className="h-8 w-8 rounded" />}
-        <h1 className="text-xl font-semibold">{config.appName}</h1>
-        <span className="text-sm text-white/50">{config.orgName}</span>
-      </header>
-      <main className="flex-1 max-w-3xl w-full mx-auto px-6 py-8 space-y-6">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Paste a document, email, or form content here..."
-          className="w-full min-h-[200px] bg-white/5 border border-white/10 rounded-lg p-4 resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    <ThemeContext.Provider value={themeCtx}>
+      <AppShell
+        config={config}
+        entries={entries}
+        activeId={activeId}
+        onSelect={handleSelect}
+        onNew={handleNew}
+        onDelete={handleDelete}
+        onClearAll={handleClearAll}
+      >
+        <ProcessPanel
+          activeEntry={activeEntry}
+          onExtract={handleExtract}
+          onEntryUpdate={(updated) => setEntries((prev) => prev.map((e) => e.id === updated.id ? updated : e))}
+          loading={extracting}
+          brandColour={config.brandColour}
         />
-        <button onClick={extract} disabled={loading || !input.trim()} style={{ backgroundColor: config.brandColour }} className="px-6 py-2.5 rounded-lg font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity">
-          {loading ? 'Extracting...' : 'Extract data'}
-        </button>
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">{error}</div>
-        )}
-        {result && result.length === 0 && (
-          <p className="text-white/50 text-center py-8">No fields could be extracted from this content.</p>
-        )}
-        {result && result.length > 0 && (
-          <div className="space-y-4 pt-4">
-            <section className="bg-white/5 border border-white/10 rounded-lg p-5">
-              <h2 className="text-lg font-semibold mb-3">Extracted Fields</h2>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-white/50 border-b border-white/10">
-                    <th className="pb-2">Field</th>
-                    <th className="pb-2">Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.map((f, i) => (
-                    <tr key={i} className="border-b border-white/5">
-                      <td className="py-2 text-white/60 font-medium">{f.key}</td>
-                      <td className="py-2 text-white/80">{f.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-            <button onClick={copy} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm transition-colors">
-              {copied ? '✓ Copied!' : 'Copy as text'}
-            </button>
-          </div>
-        )}
-      </main>
-    </div>
+      </AppShell>
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          className: 'bg-card text-foreground border-border',
+        }}
+      />
+    </ThemeContext.Provider>
   );
 }

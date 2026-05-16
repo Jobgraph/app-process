@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { loadConfig } from './config'
+import { loadConfig, resetConfigCache } from './lib/config'
 
 describe('loadConfig', () => {
-  beforeEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs() })
+  beforeEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); resetConfigCache() })
 
   it('returns defaults when VITE_DEPLOYMENT_ID is not set', async () => {
     vi.stubEnv('VITE_DEPLOYMENT_ID', '')
