@@ -6,45 +6,44 @@ interface ExtractedField {
   value: string;
 }
 
-const MOCK_RESPONSE: ExtractedField[] = [
-  { key: 'Vendor', value: 'Acme Solutions Ltd' },
-  { key: 'Invoice Number', value: 'INV-2024-0847' },
-  { key: 'Date', value: '2024-05-03' },
-  { key: 'Due Date', value: '2024-06-02' },
-  { key: 'Amount', value: '£4,250.00' },
-  { key: 'Tax (VAT 20%)', value: '£850.00' },
-  { key: 'Total', value: '£5,100.00' },
-  { key: 'Status', value: 'Unpaid' },
-  { key: 'Payment Terms', value: 'Net 30' },
-];
-
 export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [input, setInput] = useState('');
   const [result, setResult] = useState<ExtractedField[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => { loadConfig().then(setConfig); }, []);
   if (!config) return null;
 
+  if (!config.isConfigured) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <div className="text-center max-w-md space-y-4">
+          <h1 className="text-2xl font-semibold">{config.appName}</h1>
+          <p className="text-white/60">This app is not configured. Deploy it from Jobgraph to get started.</p>
+          <a href="https://app.jobgraph.com" className="inline-block px-4 py-2 bg-indigo-600 rounded-lg text-white hover:bg-indigo-500 transition-colors">Go to Jobgraph</a>
+        </div>
+      </div>
+    );
+  }
+
   async function extract() {
     setLoading(true);
     setResult(null);
+    setError('');
     try {
-      if (config!.deploymentId === 'local') {
-        await new Promise((r) => setTimeout(r, 1500));
-        setResult(MOCK_RESPONSE);
-      } else {
-        const res = await fetch(
-          `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'process' }) }
-        );
-        const data = await res.json();
-        setResult(data.fields);
-      }
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+      const res = await fetch(
+        `https://app.jobgraph.com/api/apps/${config!.deploymentId}/process`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input, type: 'process' }) }
+      );
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+      setResult(data.fields ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally { setLoading(false); }
   }
 
   function copy() {
@@ -72,7 +71,13 @@ export default function App() {
         <button onClick={extract} disabled={loading || !input.trim()} style={{ backgroundColor: config.brandColour }} className="px-6 py-2.5 rounded-lg font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity">
           {loading ? 'Extracting...' : 'Extract data'}
         </button>
-        {result && (
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">{error}</div>
+        )}
+        {result && result.length === 0 && (
+          <p className="text-white/50 text-center py-8">No fields could be extracted from this content.</p>
+        )}
+        {result && result.length > 0 && (
           <div className="space-y-4 pt-4">
             <section className="bg-white/5 border border-white/10 rounded-lg p-5">
               <h2 className="text-lg font-semibold mb-3">Extracted Fields</h2>
@@ -94,7 +99,7 @@ export default function App() {
               </table>
             </section>
             <button onClick={copy} className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-sm transition-colors">
-              {copied ? '✓ Copied!' : 'Copy extracted data'}
+              {copied ? '✓ Copied!' : 'Copy as text'}
             </button>
           </div>
         )}
