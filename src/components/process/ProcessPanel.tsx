@@ -163,9 +163,9 @@ export function ProcessPanel({
   const totalFields = result?.fields.length ?? 0;
 
   // Determine if we should show the input or results view
-  const showResults = activeEntry?.status === 'complete' && result;
   const showLoading = loading || activeEntry?.status === 'pending';
-  const showError = activeEntry?.status === 'error';
+  const showResults = !showLoading && activeEntry?.status === 'complete' && result;
+  const showError = !showLoading && activeEntry?.status === 'error';
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
