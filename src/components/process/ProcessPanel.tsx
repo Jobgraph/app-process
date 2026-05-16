@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Receipt,
@@ -70,11 +70,18 @@ export function ProcessPanel({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [localFields, setLocalFields] = useState<HistoryEntry['result']>(null);
+  const [trackedEntryId, setTrackedEntryId] = useState<string | null>(null);
 
-  // Sync local fields with active entry result
-  const result = localFields?.documentType === activeEntry?.result?.documentType
-    ? localFields
-    : activeEntry?.result ?? null;
+  // Reset local fields when the active entry changes
+  useEffect(() => {
+    if (activeEntry?.id !== trackedEntryId) {
+      setTrackedEntryId(activeEntry?.id ?? null);
+      setLocalFields(null);
+    }
+  }, [activeEntry?.id, trackedEntryId]);
+
+  // Use local edited fields if available, otherwise fall back to active entry result
+  const result = localFields ?? activeEntry?.result ?? null;
 
   const handleExtract = useCallback(() => {
     if (!input.trim()) return;
@@ -104,7 +111,7 @@ export function ProcessPanel({
     if (!result) return;
     const header = 'Field,Value,Confidence';
     const rows = result.fields.map(
-      (f) => `"${f.label}","${f.value.replace(/"/g, '""')}","${f.confidence}"`,
+      (f) => `"${f.label.replace(/"/g, '""')}","${f.value.replace(/"/g, '""')}","${f.confidence}"`,
     );
     navigator.clipboard.writeText([header, ...rows].join('\n'));
     setCopiedFormat('csv');
@@ -163,7 +170,7 @@ export function ProcessPanel({
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
       {/* Input Section */}
-      {!showResults && !showLoading && (
+      {!showResults && !showLoading && !showError && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}

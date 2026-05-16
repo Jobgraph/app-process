@@ -24,8 +24,8 @@ export function addEntry(e: HistoryEntry) {
 export function updateEntry(e: HistoryEntry) {
   const all = getHistory();
   const idx = all.findIndex((x) => x.id === e.id);
-  if (idx !== -1) all[idx] = e;
-  else all.unshift(e);
+  if (idx === -1) return;  // was deleted, don't re-add
+  all[idx] = e;
   save(all);
 }
 
