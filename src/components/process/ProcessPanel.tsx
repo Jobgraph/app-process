@@ -69,7 +69,6 @@ export function ProcessPanel({
   const [input, setInput] = useState('');
   const [template, setTemplate] = useState<DocumentType>('general');
   const [filename, setFilename] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -105,11 +104,9 @@ export function ProcessPanel({
         const reader = new FileReader();
         reader.onload = (e) => {
           const content = e.target?.result as string ?? null;
-          setFileContent(content);
           if (content) setInput(content);
         };
         reader.onerror = () => {
-          setFileContent(null);
         };
         reader.readAsText(file);
       }
@@ -219,7 +216,7 @@ export function ProcessPanel({
                 <Upload className="h-3 w-3" />
                 {filename}
                 <button
-                  onClick={() => { setFilename(null); setFileContent(null); }}
+                  onClick={() => { setFilename(null); setInput(""); }}
                   className="ml-1 hover:text-foreground"
                 >
                   <X className="h-3 w-3" />
