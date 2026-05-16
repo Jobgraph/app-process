@@ -139,6 +139,7 @@ export default function App() {
         <ProcessPanel
           activeEntry={activeEntry}
           onExtract={handleExtract}
+          onEntryUpdate={(updated) => setEntries((prev) => prev.map((e) => e.id === updated.id ? updated : e))}
           loading={extracting}
           brandColour={config.brandColour}
         />

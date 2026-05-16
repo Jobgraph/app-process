@@ -24,6 +24,7 @@ import type { DocumentType, HistoryEntry, Confidence } from '../../lib/types';
 interface ProcessPanelProps {
   activeEntry: HistoryEntry | null;
   onExtract: (input: string, template: DocumentType) => void;
+  onEntryUpdate?: (entry: HistoryEntry) => void;
   loading: boolean;
   brandColour: string;
 }
@@ -61,6 +62,7 @@ function confidenceLabel(c: Confidence) {
 export function ProcessPanel({
   activeEntry,
   onExtract,
+  onEntryUpdate,
   loading,
   brandColour,
 }: ProcessPanelProps) {
@@ -164,9 +166,10 @@ export function ProcessPanel({
     setLocalFields(updated);
     setEditingKey(null);
     setEditValue('');
-    // Persist the edit to localStorage so it survives navigation
-    updateEntry({ ...activeEntry, result: updated });
-  }, [result, editingKey, editValue, activeEntry]);
+    const updatedEntry = { ...activeEntry, result: updated };
+    updateEntry(updatedEntry);
+    onEntryUpdate?.(updatedEntry);
+  }, [result, editingKey, editValue, activeEntry, onEntryUpdate]);
 
   const cancelEdit = useCallback(() => {
     setEditingKey(null);
