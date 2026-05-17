@@ -32,6 +32,12 @@ export function resetConfigCache() {
 
 export async function loadConfig(): Promise<AppConfig> {
   if (cached) return cached;
+  const injected = (window as any).__JOBGRAPH_CONFIG__;
+  if (injected?.deploymentId) {
+    const config: AppConfig = { ...DEFAULTS, ...injected, isConfigured: true };
+    cached = config;
+    return config;
+  }
   const id = import.meta.env.VITE_DEPLOYMENT_ID;
   if (!id) {
     cached = DEFAULTS;

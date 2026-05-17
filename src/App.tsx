@@ -4,6 +4,7 @@ import { Toaster, toast } from 'sonner';
 import { ThemeContext } from './lib/theme';
 import type { DocumentType, HistoryEntry } from './lib/types';
 import { getMockExtraction } from './lib/mock';
+import { processInput, parseExtractionResult } from './lib/api';
 import {
   getHistory,
   addEntry,
@@ -70,39 +71,79 @@ export default function App() {
       setActiveId(id);
       setExtracting(true);
 
-      // Simulate extraction delay
-      setTimeout(() => {
-        try {
-          const result = getMockExtraction(input, template);
-          const completed: HistoryEntry = {
-            ...entry,
-            result,
-            status: 'complete',
-          };
-          updateEntry(completed);
-          setEntries((prev) =>
-            prev.map((e) => (e.id === id ? completed : e)),
-          );
-          toast.success(
-            `Extracted ${result.fields.length} fields from ${result.documentTypeLabel}`,
-          );
-        } catch {
-          const failed: HistoryEntry = {
-            ...entry,
-            status: 'error',
-            errorMessage: 'Extraction failed. Please try again.',
-          };
-          updateEntry(failed);
-          setEntries((prev) =>
-            prev.map((e) => (e.id === id ? failed : e)),
-          );
-          toast.error('Extraction failed');
-        } finally {
-          setExtracting(false);
-        }
-      }, 1000);
+      const useRealApi = config?.isConfigured && config.deploymentId !== 'local';
+
+      if (useRealApi) {
+        processInput(config, input)
+          .then((response) => {
+            const result = parseExtractionResult(response, template);
+            const completed: HistoryEntry = {
+              ...entry,
+              result,
+              status: 'complete',
+            };
+            updateEntry(completed);
+            setEntries((prev) =>
+              prev.map((e) => (e.id === id ? completed : e)),
+            );
+            toast.success(
+              `Extracted ${result.fields.length} fields from ${result.documentTypeLabel}`,
+            );
+          })
+          .catch((err: Error) => {
+            const isRateLimit = err.message === 'RATE_LIMITED';
+            const errorMessage = isRateLimit
+              ? 'Rate limit reached. Please wait a moment and try again.'
+              : err.message || 'Extraction failed. Please try again.';
+            const failed: HistoryEntry = {
+              ...entry,
+              status: 'error',
+              errorMessage,
+            };
+            updateEntry(failed);
+            setEntries((prev) =>
+              prev.map((e) => (e.id === id ? failed : e)),
+            );
+            toast.error(isRateLimit ? 'Rate limit reached' : 'Extraction failed');
+          })
+          .finally(() => {
+            setExtracting(false);
+          });
+      } else {
+        // Local dev fallback with mock data
+        setTimeout(() => {
+          try {
+            const result = getMockExtraction(input, template);
+            const completed: HistoryEntry = {
+              ...entry,
+              result,
+              status: 'complete',
+            };
+            updateEntry(completed);
+            setEntries((prev) =>
+              prev.map((e) => (e.id === id ? completed : e)),
+            );
+            toast.success(
+              `Extracted ${result.fields.length} fields from ${result.documentTypeLabel}`,
+            );
+          } catch {
+            const failed: HistoryEntry = {
+              ...entry,
+              status: 'error',
+              errorMessage: 'Extraction failed. Please try again.',
+            };
+            updateEntry(failed);
+            setEntries((prev) =>
+              prev.map((e) => (e.id === id ? failed : e)),
+            );
+            toast.error('Extraction failed');
+          } finally {
+            setExtracting(false);
+          }
+        }, 1000);
+      }
     },
-    [],
+    [config],
   );
 
   if (configLoading || !config) {
